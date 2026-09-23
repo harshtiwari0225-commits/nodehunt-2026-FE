@@ -128,15 +128,107 @@ export interface AdminTeamOut {
   progress: ProgressOut[];
 }
 
+export const HARDCODED_QUESTIONS: Record<string, string> = {
+  N01: `A programmer wants to find the second-largest distinct element in an integer array.
+For the input: [7, 4, 9, 9, 2, 6] the program does not correctly compute the second-largest distinct value.
+Identify the logical defect and state the correct second-largest distinct value.
+
+def second_largest(arr):
+    largest = arr[0]
+    second = arr[0]
+
+    for i in range(1, len(arr)):
+        if arr[i] > largest:
+            second = largest
+            largest = arr[i]
+        elif arr[i] > second:
+            second = arr[i]
+
+    return second`,
+
+  N02: `Given a string containing lowercase English letters, count the number of vowels in the string.
+The vowels are a, e, i, o and u.
+
+Input: algorithm
+Output: 3
+
+Write a program that performs this operation.
+Constraint: 1 ≤ length of string ≤ 10^5.`,
+
+  N03: `How many people need to be in a room before the chance that two share the same birthday exceeds 50%?`,
+
+  N04: `Answer all three questions below.
+1. Which animated film is the top most grossed animated movie?
+2. Which YouTube channel is listed as the top most viewed YouTube channel?
+3. Which novel is the best-selling novel of all time?`,
+
+  N05: `Given an integer array, remove every duplicate occurrence while keeping the first occurrence of each value in its original order.
+
+Input: [4, 2, 4, 7, 2, 9, 7, 1]
+Output: [4, 2, 7, 9, 1]
+
+Write an efficient program for the operation.
+Constraints: 1 ≤ N ≤ 10^5 and -10^9 ≤ A[i] ≤ 10^9.`,
+
+  N06: `Two threads execute the following function at the same time:
+The programmer expects the final value to be 200000, but the observed value can be smaller.
+Identify the concurrency bug and name a synchronization mechanism that can make the update safe.
+
+counter = 0
+
+def increment():
+    global counter
+
+    for _ in range(100000):
+        counter = counter + 1`,
+
+  N07: `The following program is intended to print every element of the array exactly once.
+Its output is:
+10
+20
+30
+40
+
+Identify the error and provide the corrected code.
+
+arr = [10, 20, 30, 40, 50]
+
+for i in range(0, len(arr) - 1):
+    print(arr[i])`,
+
+  N08: `Answer all three questions below.
+1. A snail climbs a 10 m pole. Each day it climbs 3 m and slips 2 m at night. On which day does it reach the top?
+2. How many trailing zeros are there in 100!?
+3. What is the smallest number that can be written as the sum of two positive cubes in two different ways?`,
+
+  N09: `Seven bells ring every:
+• 2 minutes
+• 3 minutes
+• 5 minutes
+• 7 minutes
+• 11 minutes
+• 13 minutes
+• 17 minutes
+
+They all ring together at noon.
+How many times will exactly one bell ring before 1:00 PM?`,
+
+  N10: `Given a string S and a pattern P, determine whether P occurs as a contiguous substring of S.
+
+Example 1: S = "nodehunt2026"; P = "hunt"; Output: YES
+Example 2: S = "nodehunt2026"; P = "hack"; Output: NO
+
+Implement the check.
+Constraints: 1 ≤ |S| ≤ 10^5 and 1 ≤ |P| ≤ 10^4.`,
+};
+
 const MOCK_TEAMS_KEY = "nh_mock_teams_registry";
 
 function getLocalTeams(): AdminTeamOut[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(MOCK_TEAMS_KEY);
-    if (!raw) {
-      return [];
-    }
+    if (!raw) return [];
     return JSON.parse(raw);
   } catch {
     return [];
@@ -331,20 +423,18 @@ export async function fetchNode(nodeId: string, sessionId: string, index = 0): P
 
   try {
     const data = await request<any>(`/api/node/${nodeId}?session_id=${sessionId}&index=${index}`);
-    let qText = "";
-    if (typeof data.question_text === "string") {
+    let qText = HARDCODED_QUESTIONS[nodeId] || "";
+    if (typeof data.question_text === "string" && data.question_text.trim()) {
       qText = data.question_text;
     } else if (data.question && typeof data.question === "object") {
-      qText = data.question.set1 || Object.values(data.question)[0] || "";
-    } else {
-      qText = String(data.question_text || "");
+      qText = data.question.set1 || Object.values(data.question)[0] || qText;
     }
 
     return {
       node_id: nodeId,
       node_type: data.node_type || "D",
       difficulty: data.difficulty || "easy",
-      question_text: qText || `Active Challenge Node ${nodeId}. Follow instructions and demonstrate solution to invigilator.`,
+      question_text: qText || HARDCODED_QUESTIONS[nodeId] || `Node ${nodeId} Challenge`,
       current_index: data.current_index ?? 0,
       max_questions: data.max_questions ?? 1,
       attempts_used: data.attempts_used ?? attemptsUsed,
@@ -364,10 +454,7 @@ export async function fetchNode(nodeId: string, sessionId: string, index = 0): P
       node_id: nodeId,
       node_type: (nodeObj?.type || "D") as NodeType,
       difficulty: (nodeObj?.difficulty || "easy") as Difficulty,
-      question_text:
-        nodeId === "N10"
-          ? "Final Tournament Objective Node N10: What is the chromatic number of the Petersen graph?"
-          : `Challenge Node ${nodeId}: Implement the optimal graph traversal algorithm with minimal memory overhead.`,
+      question_text: HARDCODED_QUESTIONS[nodeId] || `Node ${nodeId} Challenge`,
       current_index: 0,
       max_questions: 1,
       attempts_used: attemptsUsed,
@@ -401,7 +488,6 @@ export async function validatePasscode(
     throw new Error("Invalid invigilator passcode. Please ask your room invigilator to verify.");
   }
 
-  // Synchronize local state
   const teams = getLocalTeams();
   let team = teams.find((t) => t.id === sessionId);
   if (!team) {
@@ -427,7 +513,6 @@ export async function validatePasscode(
   const isTerminal = nodeId === "N10";
   const connectedRoutes = getConnectedRoutes(nodeId);
 
-  // If already unlocked, respond idempotently
   if (prog.movement_unlocked) {
     return {
       correct: prog.solved,
@@ -444,12 +529,10 @@ export async function validatePasscode(
     };
   }
 
-  // Increment attempt
   prog.attempts_used += 1;
   const attemptsLeft = Math.max(0, 3 - prog.attempts_used);
 
   if (isSuccess) {
-    // 1st try = 30, 2nd try = 20, 3rd try = 10
     const points = prog.attempts_used === 1 ? 30 : prog.attempts_used === 2 ? 20 : 10;
     prog.solved = true;
     prog.exhausted = false;
@@ -464,7 +547,6 @@ export async function validatePasscode(
     }
     saveLocalTeams(teams);
 
-    // Call backend
     try {
       const remoteRes = await request<ValidateResponse>("/api/validate", {
         method: "POST",
@@ -499,9 +581,7 @@ export async function validatePasscode(
     };
   }
 
-  // Strike logic
   if (prog.attempts_used >= 3) {
-    // 3 strikes exhausted: 0 points but movement unlocked!
     prog.exhausted = true;
     prog.solved = false;
     prog.movement_unlocked = true;
@@ -513,7 +593,6 @@ export async function validatePasscode(
     }
     saveLocalTeams(teams);
 
-    // Call backend
     try {
       const remoteRes = await request<ValidateResponse>("/api/validate", {
         method: "POST",
@@ -544,11 +623,9 @@ export async function validatePasscode(
     };
   }
 
-  // 1st or 2nd Strike: deduct available score for NEXT attempt, movement remains locked
   const nextAvailable = attemptsLeft === 2 ? 20 : attemptsLeft === 1 ? 10 : 0;
   saveLocalTeams(teams);
 
-  // Call backend
   try {
     const remoteRes = await request<ValidateResponse>("/api/validate", {
       method: "POST",
@@ -583,7 +660,6 @@ export async function moveTeam(sessionId: string, nodeId: string, direction: Dir
   const teams = getLocalTeams();
   const team = teams.find((t) => t.id === sessionId);
 
-  // Strictly look up outgoing edge in verified 10-node graph
   const edge = HUNT_EDGES.find((e) => e.from === nodeId && e.direction === direction);
   if (!edge) {
     throw new Error(`Invalid traversal: No path '${direction}' from ${nodeId}`);
@@ -624,7 +700,6 @@ export async function moveTeam(sessionId: string, nodeId: string, direction: Dir
 
 export async function fetchLeaderboard(): Promise<LeaderboardEntry[]> {
   const localTeams = getLocalTeams();
-  // Filter for completed teams primarily, sort by highest score, then completion time
   const sorted = [...localTeams]
     .filter((t) => t.completed)
     .sort((a, b) => b.total_score - a.total_score || (a.completed_at || "").localeCompare(b.completed_at || ""));
@@ -660,7 +735,6 @@ export async function fetchTeamResult(sessionId: string): Promise<TeamResultResp
     const teams = getLocalTeams();
     const t = teams.find((item) => item.id === sessionId);
 
-    // Compute rank amongst completed teams
     const completedSorted = [...teams]
       .filter((team) => team.completed)
       .sort((a, b) => b.total_score - a.total_score);
@@ -696,7 +770,7 @@ export async function fetchAdminTeams(secret: string): Promise<AdminTeamOut[]> {
       };
     });
   } catch (err) {
-      throw err;
+    throw err;
   }
 }
 
